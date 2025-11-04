@@ -18,66 +18,16 @@ function ProjectDetailPage() {
     contentType: 'text'
   })
   const [currentTime, setCurrentTime] = useState(0)
-  const playerRef = useRef(null)
-  const videoPlayerRef = useRef(null)
+  const iframeRef = useRef(null)
 
   useEffect(() => {
     fetchProjectData()
   }, [id])
 
-  // Initialize YouTube IFrame API
-  useEffect(() => {
-    if (!project) return
-
-    // Load YouTube IFrame API if not already loaded
-    if (!window.YT) {
-      const tag = document.createElement('script')
-      tag.src = 'https://www.youtube.com/iframe_api'
-      document.body.appendChild(tag)
-      
-      window.onYouTubeIframeAPIReady = initializePlayer
-    } else if (window.YT && window.YT.Player) {
-      initializePlayer()
-    }
-
-  }, [project])
-
-  // Separate effect for tracking current time
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (playerRef.current && playerRef.current.getCurrentTime) {
-        try {
-          const time = playerRef.current.getCurrentTime()
-          setCurrentTime(Math.floor(time))
-        } catch (err) {
-          // Ignore errors
-        }
-      }
-    }, 500)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  const initializePlayer = () => {
-    if (!videoPlayerRef.current || playerRef.current) return
-
-    playerRef.current = new window.YT.Player(videoPlayerRef.current, {
-      width: '100%',
-      height: '100%',
-      videoId: project.videoId,
-      events: {
-        onReady: onPlayerReady,
-        onStateChange: onPlayerStateChange
-      }
-    })
-  }
-
-  const onPlayerReady = (event) => {
-    console.log('Player ready, video will play')
-  }
-
-  const onPlayerStateChange = (event) => {
-    console.log('Player state:', event.data)
+  // Track time manually by user input
+  const handleTimeInput = (e) => {
+    const newTime = parseInt(e.target.value) || 0
+    setCurrentTime(newTime)
   }
 
   const fetchProjectData = async () => {
@@ -181,13 +131,38 @@ function ProjectDetailPage() {
       <div className="project-detail-content">
         <div className="video-section">
           <div className="video-player">
-            <div id="youtube-player" ref={videoPlayerRef}></div>
+            <iframe
+              ref={iframeRef}
+              width="100%"
+              height="100%"
+              src={`https://www.youtube.com/embed/${project.videoId}?enablejsapi=1`}
+              title={project.title}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
           </div>
 
           <div className="annotation-form-section">
             <h3>Add Annotation</h3>
             <div className="current-time">
               Current Time: <span className="time-display">{formatTime(currentTime)}</span>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="timeInput" className="form-label">
+                Set Time (seconds)
+              </label>
+              <input
+                id="timeInput"
+                type="number"
+                min="0"
+                className="form-input"
+                placeholder="Enter seconds"
+                value={currentTime}
+                onChange={handleTimeInput}
+              />
+              <small className="text-muted">Update this as you watch the video to track your position</small>
             </div>
 
             <form onSubmit={handleAddAnnotation} className="annotation-form">

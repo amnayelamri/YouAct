@@ -24,38 +24,45 @@ function ProjectDetailPage() {
   useEffect(() => {
     fetchProjectData()
   }, [id])
-
-  // Initialize YouTube IFrame API
+// Initialize YouTube IFrame API
   useEffect(() => {
     if (!project) return
 
-    // Load YouTube IFrame API
+    // Load YouTube IFrame API if not already loaded
     if (!window.YT) {
       const tag = document.createElement('script')
       tag.src = 'https://www.youtube.com/iframe_api'
       document.body.appendChild(tag)
+      
+      window.onYouTubeIframeAPIReady = initializePlayer
+    } else if (window.YT && window.YT.Player) {
+      initializePlayer()
     }
 
-    // Create player when API is ready
-    window.onYouTubeIframeAPIReady = () => {
-      createPlayer()
-    }
-
-    if (window.YT && window.YT.Player) {
-      createPlayer()
-    }
-
-    return () => {
-      if (playerRef.current) {
-        playerRef.current.destroy()
-      }
-    }
   }, [project])
 
-  const createPlayer = () => {
+  // Separate effect for tracking current time
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (playerRef.current && playerRef.current.getCurrentTime) {
+        try {
+          const time = playerRef.current.getCurrentTime()
+          setCurrentTime(Math.floor(time))
+        } catch (err) {
+          // Ignore errors
+        }
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const initializePlayer = () => {
     if (!videoPlayerRef.current || playerRef.current) return
 
     playerRef.current = new window.YT.Player(videoPlayerRef.current, {
+      width: '100%',
+      height: '100%',
       videoId: project.videoId,
       events: {
         onReady: onPlayerReady,
@@ -64,18 +71,13 @@ function ProjectDetailPage() {
     })
   }
 
-  const onPlayerReady = () => {
-    // Start updating current time
-    const interval = setInterval(() => {
-      if (playerRef.current && playerRef.current.getCurrentTime) {
-        setCurrentTime(Math.floor(playerRef.current.getCurrentTime()))
-      }
-    }, 100)
-    return () => clearInterval(interval)
+  const onPlayerReady = (event) => {
+    console.log('Player ready, video will play')
   }
 
   const onPlayerStateChange = (event) => {
     // Can add pause/play logic here if needed
+    console.log('Player state:', event.data)
   }
 
   const fetchProjectData = async () => {

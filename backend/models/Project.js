@@ -28,7 +28,7 @@ const projectSchema = new mongoose.Schema({
   },
   videoId: {
     type: String,
-    required: true
+    default: ''
   },
   thumbnail: {
     type: String
@@ -51,33 +51,33 @@ const projectSchema = new mongoose.Schema({
   }
 });
 
+// Single pre-save hook to extract video ID and update timestamp
 projectSchema.pre('save', function(next) {
+  // Extract video ID
   const url = this.videoLink;
   let videoId = '';
   
-  // Extract video ID from various YouTube URL formats
-  let match = url.match(/(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&]+)/);
-  if (match && match[1]) {
-    videoId = match[1];
-  } else {
-    match = url.match(/(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^?&]+)/);
-    if (match && match[1]) {
-      videoId = match[1];
+  try {
+    // Try youtube.com/watch?v=
+    if (url.includes('watch?v=')) {
+      videoId = url.split('v=')[1].split('&')[0];
     }
+    // Try youtu.be/
+    else if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1].split('?')[0].split('&')[0];
+    }
+  } catch (err) {
+    console.error('Video ID extraction error:', err);
   }
   
   this.videoId = videoId;
   
   // Generate thumbnail URL
-  if (videoId) {
+  if (videoId && videoId.length === 11) {
     this.thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
   }
   
-  next();
-});
-
-// Update the updatedAt field
-projectSchema.pre('save', function(next) {
+  // Update timestamp
   this.updatedAt = new Date();
   next();
 });

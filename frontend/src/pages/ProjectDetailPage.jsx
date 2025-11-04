@@ -12,17 +12,71 @@ function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   
-  // Annotation form state
   const [formData, setFormData] = useState({
     content: '',
-    title: ''
+    title: '',
+    contentType: 'text'
   })
   const [currentTime, setCurrentTime] = useState(0)
-  const videoRef = useRef(null)
+  const playerRef = useRef(null)
+  const videoPlayerRef = useRef(null)
 
   useEffect(() => {
     fetchProjectData()
   }, [id])
+
+  // Initialize YouTube IFrame API
+  useEffect(() => {
+    if (!project) return
+
+    // Load YouTube IFrame API
+    if (!window.YT) {
+      const tag = document.createElement('script')
+      tag.src = 'https://www.youtube.com/iframe_api'
+      document.body.appendChild(tag)
+    }
+
+    // Create player when API is ready
+    window.onYouTubeIframeAPIReady = () => {
+      createPlayer()
+    }
+
+    if (window.YT && window.YT.Player) {
+      createPlayer()
+    }
+
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy()
+      }
+    }
+  }, [project])
+
+  const createPlayer = () => {
+    if (!videoPlayerRef.current || playerRef.current) return
+
+    playerRef.current = new window.YT.Player(videoPlayerRef.current, {
+      videoId: project.videoId,
+      events: {
+        onReady: onPlayerReady,
+        onStateChange: onPlayerStateChange
+      }
+    })
+  }
+
+  const onPlayerReady = () => {
+    // Start updating current time
+    const interval = setInterval(() => {
+      if (playerRef.current && playerRef.current.getCurrentTime) {
+        setCurrentTime(Math.floor(playerRef.current.getCurrentTime()))
+      }
+    }, 100)
+    return () => clearInterval(interval)
+  }
+
+  const onPlayerStateChange = (event) => {
+    // Can add pause/play logic here if needed
+  }
 
   const fetchProjectData = async () => {
     try {
@@ -39,10 +93,6 @@ function ProjectDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleVideoTimeUpdate = (e) => {
-    setCurrentTime(Math.floor(e.target.currentTime))
   }
 
   const formatTime = (seconds) => {
@@ -65,10 +115,10 @@ function ProjectDetailPage() {
         currentTime,
         formData.content,
         formData.title,
-        'text'
+        formData.contentType
       )
 
-      setFormData({ content: '', title: '' })
+      setFormData({ content: '', title: '', contentType: 'text' })
       fetchProjectData()
     } catch (err) {
       alert('Failed to add annotation: ' + (err.response?.data?.message || err.message))
@@ -86,7 +136,6 @@ function ProjectDetailPage() {
     }
   }
 
-  // Get annotations that should be visible at current time
   const visibleAnnotations = annotations
     .filter(ann => ann.timestamp <= currentTime)
     .sort((a, b) => b.timestamp - a.timestamp)
@@ -120,17 +169,7 @@ function ProjectDetailPage() {
       <div className="project-detail-content">
         <div className="video-section">
           <div className="video-player">
-            <iframe
-              ref={videoRef}
-              width="100%"
-              height="100%"
-              src={`https://www.youtube.com/embed/${project.videoId}?enablejsapi=1`}
-              title={project.title}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              onTimeUpdate={handleVideoTimeUpdate}
-            ></iframe>
+            <div id="youtube-player" ref={videoPlayerRef}></div>
           </div>
 
           <div className="annotation-form-section">
@@ -141,11 +180,23 @@ function ProjectDetailPage() {
 
             <form onSubmit={handleAddAnnotation} className="annotation-form">
               <div className="form-group">
+                <label htmlFor="contentType" className="form-label">Type</label>
+                <select
+                  id="contentType"
+                  value={formData.contentType}
+                  onChange={(e) => setFormData({ ...formData, contentType: e.target.value })}
+                  className="form-input"
+                >
+                  <option value="text">Text</option>
+                  <option value="embed">YouTube Video</option>
+                </select>
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="title" className="form-label">Title (optional)</label>
                 <input
                   id="title"
                   type="text"
-                  name="title"
                   className="form-input"
                   placeholder="e.g., Step 1: Setup"
                   value={formData.title}
@@ -154,12 +205,15 @@ function ProjectDetailPage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="content" className="form-label">Content *</label>
+                <label htmlFor="content" className="form-label">
+                  {formData.contentType === 'text' ? 'Text Content' : 'YouTube Link'} *
+                </label>
                 <textarea
                   id="content"
-                  name="content"
                   className="form-textarea"
-                  placeholder="Write your annotation..."
+                  placeholder={formData.contentType === 'text' 
+                    ? 'Write your annotation...' 
+                    : 'https://www.youtube.com/watch?v=...'}
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   required
@@ -194,7 +248,20 @@ function ProjectDetailPage() {
                     {annotation.title && (
                       <h4 className="annotation-title">{annotation.title}</h4>
                     )}
-                    <p>{annotation.content}</p>
+                    
+                    {annotation.contentType === 'embed' ? (
+                      <iframe
+                        width="100%"
+                        height="200"
+                        src={`https://www.youtube.com/embed/${extractVideoId(annotation.content)}`}
+                        title={annotation.title || 'Video'}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    ) : (
+                      <p>{annotation.content}</p>
+                    )}
 
                     <button
                       onClick={() => handleDeleteAnnotation(annotation._id)}
@@ -227,6 +294,17 @@ function ProjectDetailPage() {
       </div>
     </main>
   )
+}
+
+// Helper function to extract video ID from URL
+function extractVideoId(url) {
+  let videoId = ''
+  if (url.includes('watch?v=')) {
+    videoId = url.split('v=')[1].split('&')[0]
+  } else if (url.includes('youtu.be/')) {
+    videoId = url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+  }
+  return videoId
 }
 
 export default ProjectDetailPage

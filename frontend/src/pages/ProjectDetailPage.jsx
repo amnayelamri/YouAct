@@ -24,7 +24,8 @@ function ProjectDetailPage() {
   useEffect(() => {
     fetchProjectData()
   }, [id])
-// Initialize YouTube IFrame API
+
+  // Initialize YouTube IFrame API
   useEffect(() => {
     if (!project) return
 
@@ -76,7 +77,6 @@ function ProjectDetailPage() {
   }
 
   const onPlayerStateChange = (event) => {
-    // Can add pause/play logic here if needed
     console.log('Player state:', event.data)
   }
 
@@ -101,6 +101,16 @@ function ProjectDetailPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const extractVideoId = (url) => {
+    let videoId = ''
+    if (url.includes('watch?v=')) {
+      videoId = url.split('v=')[1].split('&')[0]
+    } else if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+    }
+    return videoId
   }
 
   const handleAddAnnotation = async (e) => {
@@ -252,15 +262,17 @@ function ProjectDetailPage() {
                     )}
                     
                     {annotation.contentType === 'embed' ? (
-                      <iframe
-                        width="100%"
-                        height="200"
-                        src={`https://www.youtube.com/embed/${extractVideoId(annotation.content)}`}
-                        title={annotation.title || 'Video'}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      ></iframe>
+                      <div className="embedded-video">
+                        <iframe
+                          width="100%"
+                          height="200"
+                          src={`https://www.youtube.com/embed/${extractVideoId(annotation.content)}`}
+                          title={annotation.title || 'Video'}
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
                     ) : (
                       <p>{annotation.content}</p>
                     )}
@@ -296,17 +308,6 @@ function ProjectDetailPage() {
       </div>
     </main>
   )
-}
-
-// Helper function to extract video ID from URL
-function extractVideoId(url) {
-  let videoId = ''
-  if (url.includes('watch?v=')) {
-    videoId = url.split('v=')[1].split('&')[0]
-  } else if (url.includes('youtu.be/')) {
-    videoId = url.split('youtu.be/')[1].split('?')[0].split('&')[0]
-  }
-  return videoId
 }
 
 export default ProjectDetailPage

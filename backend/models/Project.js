@@ -51,17 +51,19 @@ const projectSchema = new mongoose.Schema({
   }
 });
 
-// Extract video ID from YouTube link before saving
 projectSchema.pre('save', function(next) {
   const url = this.videoLink;
   let videoId = '';
   
-  // Extract from various YouTube URL formats
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const match = url.match(regExp);
-  
-  if (match && match[2].length === 11) {
-    videoId = match[2];
+  // Extract video ID from various YouTube URL formats
+  let match = url.match(/(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&]+)/);
+  if (match && match[1]) {
+    videoId = match[1];
+  } else {
+    match = url.match(/(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^?&]+)/);
+    if (match && match[1]) {
+      videoId = match[1];
+    }
   }
   
   this.videoId = videoId;

@@ -18,16 +18,90 @@ function ProjectDetailPage() {
     contentType: 'text'
   })
   const [currentTime, setCurrentTime] = useState(0)
-  const iframeRef = useRef(null)
+  const playerRef = useRef(null)
+  const containerRef = useRef(null)
+  const timeIntervalRef = useRef(null)
 
   useEffect(() => {
     fetchProjectData()
   }, [id])
 
-  // Track time manually by user input
-  const handleTimeInput = (e) => {
-    const newTime = parseInt(e.target.value) || 0
-    setCurrentTime(newTime)
+  // Initialize YouTube API
+  useEffect(() => {
+    if (!window.YT) {
+      const tag = document.createElement('script')
+      tag.src = 'https://www.youtube.com/iframe_api'
+      const firstScriptTag = document.getElementsByTagName('script')[0]
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+      window.onYouTubeIframeAPIReady = createPlayer
+    } else if (window.YT && window.YT.Player && project) {
+      createPlayer()
+    }
+
+    return () => {
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current)
+      }
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy()
+        } catch (err) {
+          // Ignore
+        }
+      }
+    }
+  }, [project])
+
+  const createPlayer = () => {
+    if (!project || !containerRef.current) return
+    if (playerRef.current) return
+
+    try {
+      playerRef.current = new window.YT.Player(containerRef.current, {
+        videoId: project.videoId,
+        width: '100%',
+        height: '100%',
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      })
+    } catch (err) {
+      console.error('Failed to create player:', err)
+    }
+  }
+
+  const onPlayerReady = () => {
+    // Start polling for current time
+    startTimeTracking()
+  }
+
+  const onPlayerStateChange = (event) => {
+    // 1 = playing, 0 = ended, 2 = paused, 3 = buffering, 5 = cued
+    if (event.data === window.YT.PlayerState.PLAYING) {
+      startTimeTracking()
+    } else if (event.data === window.YT.PlayerState.PAUSED) {
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current)
+      }
+    }
+  }
+
+  const startTimeTracking = () => {
+    if (timeIntervalRef.current) {
+      clearInterval(timeIntervalRef.current)
+    }
+
+    timeIntervalRef.current = setInterval(() => {
+      if (playerRef.current && playerRef.current.getCurrentTime) {
+        try {
+          const time = Math.floor(playerRef.current.getCurrentTime())
+          setCurrentTime(time)
+        } catch (err) {
+          // Ignore errors
+        }
+      }
+    }, 500)
   }
 
   const fetchProjectData = async () => {
@@ -98,6 +172,7 @@ function ProjectDetailPage() {
     }
   }
 
+  // Get all annotations that should be visible (timestamp <= currentTime)
   const visibleAnnotations = annotations
     .filter(ann => ann.timestamp <= currentTime)
     .sort((a, b) => b.timestamp - a.timestamp)
@@ -131,38 +206,13 @@ function ProjectDetailPage() {
       <div className="project-detail-content">
         <div className="video-section">
           <div className="video-player">
-            <iframe
-              ref={iframeRef}
-              width="100%"
-              height="100%"
-              src={`https://www.youtube.com/embed/${project.videoId}?enablejsapi=1`}
-              title={project.title}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            ></iframe>
+            <div ref={containerRef} id="youtube-player"></div>
           </div>
 
           <div className="annotation-form-section">
             <h3>Add Annotation</h3>
             <div className="current-time">
               Current Time: <span className="time-display">{formatTime(currentTime)}</span>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="timeInput" className="form-label">
-                Set Time (seconds)
-              </label>
-              <input
-                id="timeInput"
-                type="number"
-                min="0"
-                className="form-input"
-                placeholder="Enter seconds"
-                value={currentTime}
-                onChange={handleTimeInput}
-              />
-              <small className="text-muted">Update this as you watch the video to track your position</small>
             </div>
 
             <form onSubmit={handleAddAnnotation} className="annotation-form">
@@ -216,12 +266,12 @@ function ProjectDetailPage() {
         </div>
 
         <div className="annotations-section">
-          <h3>Annotations</h3>
+          <h3>📌 Live Annotations ({visibleAnnotations.length})</h3>
 
           {visibleAnnotations.length === 0 ? (
             <div className="empty-annotations">
               <p>No annotations for this moment</p>
-              <p className="text-sm text-muted">Add annotations at specific timestamps using the form on the left</p>
+              <p className="text-sm text-muted">Annotations appear here when video reaches their timestamp</p>
             </div>
           ) : (
             <div className="annotations-list">
@@ -242,7 +292,7 @@ function ProjectDetailPage() {
                           width="100%"
                           height="200"
                           src={`https://www.youtube.com/embed/${extractVideoId(annotation.content)}`}
-                          title={annotation.title || 'Video'}
+                          title={annotation.title || 'Embedded Video'}
                           frameBorder="0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                           allowFullScreen
@@ -266,12 +316,12 @@ function ProjectDetailPage() {
           )}
 
           <div className="all-annotations-summary">
-            <h4>All Annotations ({annotations.length})</h4>
+            <h4>📋 All Annotations ({annotations.length})</h4>
             <div className="annotations-timeline">
               {annotations.map((annotation) => (
                 <div
                   key={annotation._id}
-                  className="timeline-item"
+                  className={`timeline-item ${annotation.timestamp <= currentTime ? 'active' : ''}`}
                   title={annotation.title || annotation.content.substring(0, 50)}
                 >
                   {formatTime(annotation.timestamp)}

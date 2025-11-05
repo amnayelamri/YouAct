@@ -45,7 +45,7 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.video-player div {
+.video-player iframe {
   position: absolute;
   top: 0;
   left: 0;
@@ -53,12 +53,63 @@
   height: 100%;
 }
 
-.video-player iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
+/* Time Control */
+.time-control {
+  background-color: white;
+  padding: var(--spacing-md);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.time-display {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.current-time-value {
+  font-size: 2rem;
+  color: var(--primary);
+}
+
+.time-slider {
   width: 100%;
-  height: 100%;
+  height: 8px;
+  border-radius: 5px;
+  background: var(--border);
+  outline: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.time-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.time-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.time-control .btn {
+  padding: var(--spacing-md);
+  font-weight: 600;
 }
 
 /* Annotation Form */
